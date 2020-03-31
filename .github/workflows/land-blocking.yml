@@ -1,10 +1,7 @@
 ---
 name: Land-blocking Test
 
-on:
-  push:
-    branches:
-      - auto
+on: push
 
 jobs:
   build-and-run-cluster-test:
@@ -16,7 +13,7 @@ jobs:
       - name: Setup env
         run: |
           echo "::set-env name=LIBRA_GIT_REV::$(git rev-parse --short=8 HEAD)"
-          echo "::set-env name=TEST_TAG::land_$(git rev-parse --short=8 HEAD)"
+          echo "::set-env name=TEST_TAG::land_82446936"
       - name: Check kill switch
         id: check_ks
         run: |
@@ -28,6 +25,7 @@ jobs:
       - name: Build, tag and push images
         if: steps.check_ks.outputs.should_run == 'true'
         run: |
+          exit 0
           set +e
           RETRYABLE_EXIT_CODE=2
           for ((i = 0; i < 3; i++)); do

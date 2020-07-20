@@ -26,13 +26,33 @@ use tokio::time;
 pub async fn update_batch_instance(
     context: &mut Context<'_>,
     updated_instance: &[Instance],
+    updated_lsr: &[Instance],
     updated_tag: String,
 ) -> anyhow::Result<()> {
-    let deadline = Instant::now() + Duration::from_secs(2 * 60);
+    let deadline = Instant::now() + Duration::from_secs(4 * 60);
 
     info!("Stop Existing instances.");
     let futures: Vec<_> = updated_instance.iter().map(Instance::stop).collect();
     try_join_all(futures).await?;
+    info!("Stop associated lsr instances.");
+    let futures: Vec<_> = updated_lsr.iter().map(Instance::stop).collect();
+    try_join_all(futures).await?;
+
+    info!("Reinstantiate a set of new lsr.");
+    let futures: Vec<_> = updated_lsr
+        .iter()
+        .map(|instance| {
+            let mut newer_config = instance.instance_config().clone();
+            newer_config.replace_tag(updated_tag.clone()).unwrap();
+            context
+                .cluster_swarm
+                .spawn_new_instance(newer_config, false)
+        })
+        .collect();
+    try_join_all(futures).await?;
+
+    info!("Wait for the instance to sync up with peers");
+    time::delay_for(Duration::from_secs(20)).await;
 
     info!("Reinstantiate a set of new nodes.");
     let futures: Vec<_> = updated_instance
@@ -61,15 +81,6 @@ pub async fn update_batch_instance(
     Ok(())
 }
 
-pub fn get_instance_list_str(batch: &[Instance]) -> String {
-    let mut nodes_list = String::from("");
-    for instance in batch.iter() {
-        nodes_list.push_str(&instance.to_string());
-        nodes_list.push_str(", ")
-    }
-    nodes_list
-}
-
 #[derive(StructOpt, Debug)]
 pub struct CompatiblityTestParams {
     #[structopt(
@@ -85,7 +96,9 @@ pub struct CompatiblityTestParams {
 pub struct CompatibilityTest {
     first_node: Instance,
     first_batch: Vec<Instance>,
+    first_batch_lsr: Vec<Instance>,
     second_batch: Vec<Instance>,
+    second_batch_lsr: Vec<Instance>,
     full_nodes: Vec<Instance>,
     updated_image_tag: String,
 }
@@ -102,14 +115,23 @@ impl ExperimentParam for CompatiblityTestParams {
         }
         let (first_batch, second_batch) = cluster.split_n_validators_random(self.count);
         let mut first_batch = first_batch.into_validator_instances();
+        let second_batch = second_batch.into_validator_instances();
         let first_node = first_batch
             .pop()
             .expect("Requires at least one validator in the first batch");
+        let mut first_batch_lsr = vec![];
+        let mut second_batch_lsr = vec![];
+        if cluster.lsr_instances().len() != 0 {
+            first_batch_lsr = cluster.get_lsr_instances(&first_batch);
+            second_batch_lsr = cluster.get_lsr_instances(&second_batch);
+        }
 
         Self::E {
             first_node,
             first_batch,
-            second_batch: second_batch.into_validator_instances(),
+            first_batch_lsr,
+            second_batch,
+            second_batch_lsr,
             full_nodes: cluster.fullnode_instances().to_vec(),
             updated_image_tag: self.updated_image_tag,
         }
@@ -136,33 +158,18 @@ impl Experiment for CompatibilityTest {
             context.global_emit_job_request,
         );
         let job_duration = Duration::from_secs(3);
-        context.report.report_text(format!(
-            "Compatibility test results for {} ==> {} (PR)",
-            context.current_tag, self.updated_image_tag
-        ));
 
         // Generate some traffic
-        let msg = format!(
-            "1. All instances running {}, generating some traffic on network",
-            context.current_tag
-        );
-        info!("{}", msg);
-        context.report.report_text(msg);
         context
             .tx_emitter
             .emit_txn_for(job_duration, fullnode_txn_job.clone())
             .await
             .map_err(|e| anyhow::format_err!("Failed to generate traffic: {}", e))?;
 
-        let msg = format!(
-            "2. First validator {} ==> {}, to validate storage",
-            context.current_tag, self.updated_image_tag
-        );
-        info!("{}", msg);
-        info!("Upgrading validator: {}", self.first_node);
-        context.report.report_text(msg);
+        info!("1. Changing the images for the first instance to validate storage");
         let first_node = vec![self.first_node.clone()];
-        update_batch_instance(context, &first_node, self.updated_image_tag.clone()).await?;
+        let mut lsr = vec![];
+        update_batch_instance(context, &first_node, &lsr, self.updated_image_tag.clone()).await?;
         context
             .tx_emitter
             .emit_txn_for(
@@ -172,38 +179,27 @@ impl Experiment for CompatibilityTest {
             .await
             .map_err(|e| anyhow::format_err!("Storage backwards compat broken: {}", e))?;
 
-        let msg = format!(
-            "3. First batch validators ({}) {} ==> {}, to test consensus",
-            self.first_batch.len(),
-            context.current_tag,
-            self.updated_image_tag
-        );
-        info!("{}", msg);
-        info!(
-            "Upgrading validators: {}",
-            get_instance_list_str(&self.first_batch)
-        );
-        context.report.report_text(msg);
-        update_batch_instance(context, &self.first_batch, self.updated_image_tag.clone()).await?;
+        context
+            .report
+            .report_metric(self.to_string(), "storage_compat", 1.0);
+
+        info!("2. Changing images for the first batch to test consensus");
+        if !self.first_batch_lsr.is_empty() {
+            lsr = self.first_batch_lsr.clone();
+        }
+        update_batch_instance(context, &self.first_batch, &lsr, self.updated_image_tag.clone()).await?;
         context
             .tx_emitter
             .emit_txn_for(job_duration, validator_txn_job.clone())
             .await
             .map_err(|e| anyhow::format_err!("Consensus backwards compat broken: {}", e))?;
 
-        let msg = format!(
-            "4. Second batch validators ({}) {} ==> {}, to upgrade rest of the validators",
-            self.second_batch.len(),
-            context.current_tag,
-            self.updated_image_tag
-        );
-        info!("{}", msg);
-        info!(
-            "Upgrading validators: {}",
-            get_instance_list_str(&self.second_batch)
-        );
-        context.report.report_text(msg);
-        update_batch_instance(context, &self.second_batch, self.updated_image_tag.clone()).await?;
+        context
+            .report
+            .report_metric(self.to_string(), "consensus_compat", 1.0);
+
+        info!("3. Changing images for the rest of the nodes");
+        update_batch_instance(context, &self.second_batch, &lsr, self.updated_image_tag.clone()).await?;
         context
             .tx_emitter
             .emit_txn_for(job_duration, validator_txn_job)
@@ -212,19 +208,8 @@ impl Experiment for CompatibilityTest {
                 anyhow::format_err!("Failed to upgrade rest of validator images: {}", e)
             })?;
 
-        let msg = format!(
-            "5. All full nodes ({}) {} ==> {}, to finish the network upgrade",
-            self.full_nodes.len(),
-            context.current_tag,
-            self.updated_image_tag
-        );
-        info!("{}", msg);
-        info!(
-            "Upgrading full nodes: {}",
-            get_instance_list_str(&self.full_nodes)
-        );
-        context.report.report_text(msg);
-        update_batch_instance(context, &self.full_nodes, self.updated_image_tag.clone()).await?;
+        info!("4. Changing images for full nodes");
+        update_batch_instance(context, &self.full_nodes, &lsr, self.updated_image_tag.clone()).await?;
         context
             .tx_emitter
             .emit_txn_for(job_duration, fullnode_txn_job)
@@ -240,12 +225,14 @@ impl Experiment for CompatibilityTest {
 
 impl fmt::Display for CompatibilityTest {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Compatibility test, phased upgrade to {} in batches of 1, {}, {}",
-            self.updated_image_tag,
-            self.first_batch.len(),
-            self.second_batch.len()
-        )
+        write!(f, "Updating [")?;
+        for instance in self.first_batch.iter() {
+            write!(f, "{}, ", instance)?;
+        }
+        for instance in self.second_batch.iter() {
+            write!(f, "{}, ", instance)?;
+        }
+        write!(f, "]")?;
+        writeln!(f, "Updated Config: {:?}", self.updated_image_tag)
     }
 }

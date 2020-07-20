@@ -17,6 +17,7 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
+use libra_logger::info;
 use tokio::{process::Command, time};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -116,6 +117,7 @@ impl InstanceConfig {
                 c.image_tag = new_tag;
             }
             ApplicationConfig::LSR(c) => {
+                info!("hhhhhhh, update lsr tag");
                 c.image_tag = new_tag;
             }
             ApplicationConfig::Vault(..) => {
@@ -232,6 +234,7 @@ impl Instance {
             }
             time::delay_for(Duration::from_secs(3)).await;
         }
+        info!("health check passed {}", self);
         Ok(())
     }
 

@@ -89,8 +89,9 @@ impl Experiment for ValidatorVersioning {
             )
             .await?;
 
+        let lsr = vec![];
         info!("1. Changing the images for the instances in the first batch");
-        update_batch_instance(context, &self.first_batch, self.updated_image_tag.clone()).await?;
+        update_batch_instance(context, &self.first_batch, &lsr, self.updated_image_tag.clone()).await?;
 
         info!("2. Send a transaction to make sure it is not rejected nor cause any fork");
         let full_node = context.cluster.random_fullnode_instance();
@@ -131,7 +132,7 @@ impl Experiment for ValidatorVersioning {
             .await?;
 
         info!("3. Change the rest of the images in the second batch");
-        update_batch_instance(context, &self.second_batch, self.updated_image_tag.clone()).await?;
+        update_batch_instance(context, &self.second_batch, &lsr, self.updated_image_tag.clone()).await?;
 
         info!("4. Send a transaction to make sure this feature is still not activated.");
         let txn2 = txn_gen(&mut account_1)?;
@@ -182,7 +183,7 @@ impl Experiment for ValidatorVersioning {
         };
 
         info!("7. Change the images for the full nodes");
-        update_batch_instance(context, &self.full_nodes, self.updated_image_tag.clone()).await?;
+        update_batch_instance(context, &self.full_nodes, &lsr, self.updated_image_tag.clone()).await?;
 
         info!("8. Send a transaction to make sure it gets dropped by the full node mempool.");
 

@@ -228,4 +228,34 @@ impl Cluster {
         self.all_instances()
             .filter(move |v| v.validator_group() == validator_group)
     }
+
+    pub fn get_lsr_instances (
+        &self,
+        validators: &Vec<Instance>,
+    ) -> Vec<Instance> {
+        validators
+            .iter()
+            .filter_map(|l| {
+                self.lsr_instances
+                    .iter()
+                    .find(|x| l.validator_group() == x.validator_group())
+                    .cloned()
+            })
+            .collect()
+    }
+
+    pub fn get_vault_instances (
+        &self,
+        validators: &Vec<Instance>,
+    ) -> Vec<Instance> {
+        validators
+            .iter()
+            .filter_map(|v| {
+                self.vault_instances
+                    .iter()
+                    .find(|x| v.validator_group() == x.validator_group())
+                    .cloned()
+            })
+            .collect()
+    }
 }

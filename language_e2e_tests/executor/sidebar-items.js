@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["RELEASE_1_1_GENESIS",""],["RELEASE_1_1_GENESIS_PRIVKEY",""],["RELEASE_1_1_GENESIS_PUBKEY",""]],"struct":[["FakeExecutor","Provides an environment to run a VM instance."]]});

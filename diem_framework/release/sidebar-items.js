@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["create_release","Create a Diem Framework release in the specified directroy."]],"struct":[["ReleaseOptions","Options to configure the generation of a release."]]});

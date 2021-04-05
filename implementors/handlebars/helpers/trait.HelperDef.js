@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["boogie_backend"] = [{"text":"impl <a class=\"trait\" href=\"https://docs.rs/handlebars/3.5.3/handlebars/helpers/trait.HelperDef.html\" title=\"trait handlebars::helpers::HelperDef\">HelperDef</a> for <a class=\"struct\" href=\"boogie_backend/prelude_template_helpers/struct.StratificationHelper.html\" title=\"struct boogie_backend::prelude_template_helpers::StratificationHelper\">StratificationHelper</a>","synthetic":false,"types":["boogie_backend::prelude_template_helpers::StratificationHelper"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

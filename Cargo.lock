@@ -2416,7 +2416,7 @@ dependencies = [
  "rusty-fork",
  "serde",
  "serde_json",
- "standback",
+ "standback 0.3.1",
  "subtle",
  "syn 0.15.44",
  "syn 1.0.62",
@@ -6631,9 +6631,18 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "standback"
-version = "0.2.15"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2beb4d1860a61f571530b3f855a1b538d0200f7871c63331ecd6f17b1f014f8"
+checksum = "e113fb6f3de07a243d434a56ec6f186dfd51cb08448239fe7bcae73f87ff28ff"
+dependencies = [
+ "version_check",
+]
+
+[[package]]
+name = "standback"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17bc93f7436e748d03cd285d6b406a274953eda71365e368401f92854a083ac6"
 dependencies = [
  "version_check",
 ]
@@ -7125,7 +7134,7 @@ checksum = "1195b046942c221454c2539395f85413b33383a067449d78aab2b7b052a142f7"
 dependencies = [
  "const_fn",
  "libc",
- "standback",
+ "standback 0.2.17",
  "stdweb",
  "time-macros",
  "version_check",
@@ -7151,7 +7160,7 @@ dependencies = [
  "proc-macro-hack",
  "proc-macro2 1.0.24",
  "quote 1.0.9",
- "standback",
+ "standback 0.2.17",
  "syn 1.0.62",
 ]
 

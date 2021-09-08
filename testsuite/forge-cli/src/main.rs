@@ -404,7 +404,7 @@ impl Test for RestartValidator {
 impl NetworkTest for RestartValidator {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
         let node = ctx.swarm().validators_mut().next().unwrap();
-        node.health_check().expect("node health check failed");
+        node.health_check().expect("node health check faild");
         node.stop()?;
         println!("Restarting node {}", node.peer_id());
         node.start()?;

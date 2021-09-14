@@ -66,6 +66,7 @@ def create_forge_job(context, user, tag, base_tag, timeout_secs, forge_envs, for
         template["spec"]["template"]["spec"]["containers"][0]["env"].append(
             {"name": name, "value": value}
         )
+    template["spec"]["template"]["spec"]["restartPolicy"] = "Never"
     # new image tag
     image_repo, _ = template["spec"]["template"]["spec"]["containers"][0][
         "image"

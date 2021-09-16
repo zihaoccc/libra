@@ -30,14 +30,16 @@ use cluster_test::{
 };
 use diem_config::config::DEFAULT_JSON_RPC_PORT;
 use diem_sdk::types::LocalAccount;
-use forge::SlackClient;
+use forge::{SlackClient, TxnEmitter, EmitThreadParams as ThreadParams, EmitJobRequest as JobRequest, ChainInfo};
 use futures::{
     future::{join_all, FutureExt},
     select,
 };
-use itertools::zip;
+use itertools::{zip, Itertools};
 use std::cmp::min;
 use tokio::time::{sleep, sleep_until, Instant as TokioInstant};
+use rand::{SeedableRng, Rng};
+use rand::rngs::OsRng;
 
 const HEALTH_POLL_INTERVAL: Duration = Duration::from_secs(5);
 
@@ -231,7 +233,7 @@ async fn handle_cluster_test_runner_commands(
             Reset {}
         );
     } else if args.emit_tx {
-        emit_tx(&runner.cluster, args).await?;
+        emit_tx_forge(&runner.cluster, args).await?;
     } else if let Some(ref exec) = args.exec {
         let pos = exec.find(':');
         let pos = pos.ok_or_else(|| {
@@ -302,6 +304,46 @@ fn parse_host_port(s: &str) -> Result<(String, u32, Option<u32>)> {
         return Ok((host, port, Some(debug_interface_port)));
     }
     Ok((host, port, None))
+}
+
+async fn emit_tx_forge(cluster: &Cluster, args: &Args) -> Result<()> {
+    let clients = cluster.validator_instances().iter().map(|n| {
+        n.json_rpc_client()
+    }).collect_vec();
+    let client = cluster.random_validator_instance().json_rpc_client();
+    let emitter_ct = TxEmitter::new(cluster, args.vasp);
+    let mut dd = emitter_ct.load_faucet_account(&client).await?;
+    let mut root = emitter_ct.load_diem_root_account(&client).await?;
+    let mut tc = emitter_ct.load_tc_account(&client).await?;
+    let url = cluster.random_validator_instance().json_rpc_url().to_string();
+    let chain_info = ChainInfo::new(
+        &mut root,
+        &mut tc,
+        &mut dd,
+        url,
+        cluster.chain_id,
+    );
+    let accounts_per_client = args.accounts_per_client;
+    let workers_per_ac = args.workers_per_ac;
+    let thread_params = ThreadParams {
+        wait_millis: args.wait_millis,
+        wait_committed: !args.burst,
+    };
+    let duration = Duration::from_secs(args.duration);
+    let rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
+    let mut emitter = TxnEmitter::new(chain_info, rng);
+    let stats = emitter
+        .emit_txn_for(
+            duration,
+            JobRequest {
+                json_rpc_clients: clients,
+                accounts_per_client,
+                thread_params,
+                workers_per_endpoint: workers_per_ac,
+            }).await?;
+    println!("Total stats: {}", stats);
+    println!("Average rate: {}", stats.rate(duration));
+    Ok(())
 }
 
 async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {

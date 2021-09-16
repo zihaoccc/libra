@@ -22,15 +22,10 @@ use rand::{
     Rng,
 };
 use rand_core::SeedableRng;
-use std::{
-    cmp::{max, min},
-    collections::HashSet,
-    sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc,
-    },
-    time::{Duration, Instant, SystemTime},
-};
+use std::{cmp::{max, min}, collections::HashSet, sync::{
+    atomic::{AtomicBool, AtomicU64, Ordering},
+    Arc,
+}, time::{Duration, Instant, SystemTime}, fmt};
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
 pub mod atomic_histogram;
@@ -805,5 +800,25 @@ impl TxnStats {
             },
             p99_latency: self.latency_buckets.percentile(99, 100),
         }
+    }
+}
+
+impl fmt::Display for TxnStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "submitted: {}, committed: {}, expired: {}",
+            self.submitted, self.committed, self.expired,
+        )
+    }
+}
+
+impl fmt::Display for TxnStatsRate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "submitted: {} txn/s, committed: {} txn/s, expired: {} txn/s, latency: {} ms, p99 latency: {} ms",
+            self.submitted, self.committed, self.expired, self.latency, self.p99_latency,
+        )
     }
 }

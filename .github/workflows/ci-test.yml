@@ -1004,13 +1004,31 @@ jobs:
           if ${{ needs.need-base-images.result!='success' }}; then
             cmd="./scripts/fgi/run --tag ${{ needs.build-images.outputs.head-tag }} --suite land_blocking"
           else
-            cmd="./scripts/fgi/run -E SLACK_URL=${{ secrets.WEBHOOK_FORGE }} --tag ${{ needs.build-images.outputs.head-tag }} --base-image-tag ${{ needs.need-base-images.outputs.prev-tag }} --suite land_blocking_compat"
+            cmd="./scripts/fgi/run -E SLACK_URL=${{ secrets.WEBHOOK_FORGE }} --tag ${{ needs.build-images.outputs.head-tag }} --base-image-tag ${{ needs.need-base-images.outputs.prev-tag }} --suite land_blocking_compat --report report.json"
           fi
           eval $cmd
           ret=$?
           echo "fgi exit code: $ret"
           echo "FGI_REPRO_CMD=$cmd" >> $GITHUB_ENV
           echo "FGI_EXIT_CODE=$ret" >> $GITHUB_ENV
+          if [ -s "report.json" ]; then
+            echo "report.json start"
+            cat report.json
+            echo "report.json end"
+            msg_text="$msg_text Report:\n$(cat report.json)"
+            echo msg_text
+      - name: test
+        uses: actions/github-script@v4.0.2
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            data = await fsp.readFile('report.json', 'utf-8');
+            var result = JSON.parse(data);
+            body = `Forge Test Result
+            \`\`\`
+            ${result.text}
+            \`\`\`
+            `;
       - name: Post test results on PR
         id: post-test-result
         if: always()

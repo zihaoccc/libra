@@ -114,7 +114,7 @@ impl ClusterBuilder {
             // instances which are going into termination state
             aws::set_asg_size(0, 0.0, &asg_name, true, true)
                 .await
-                .map_err(|err| format_err!("{} scale down failed: {}", asg_name, err))?;
+                .map_err(|err| format_err!("{} scale down failed: {} ", asg_name, err))?;
             // Then scale up and bring up new instances
             aws::set_asg_size(instance_count as i64, 5.0, &asg_name, true, false)
                 .await

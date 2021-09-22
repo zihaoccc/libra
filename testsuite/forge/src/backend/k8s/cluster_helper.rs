@@ -416,15 +416,16 @@ pub fn set_eks_nodegroup_size(
 
     // nodegroup scaling factors
     let max_surge = 2; // multiplier for max size
+    let buffer = 1; // extra node as buffer
     let num_validators: i64 = num_validators as i64;
     let idle_utilities_size = 5; // keep extra utilities nodes around for forge pods and monitoring
     let validator_scaling = NodegroupScalingConfig {
-        desired_size: Some(cmp::max(num_validators * 3, 1)),
+        desired_size: Some(cmp::max(num_validators * 3 + buffer, 1)),
         max_size: Some(cmp::max((num_validators * 3 + 1) * max_surge, 1)),
         min_size: Some(cmp::max(num_validators * 3, 1)),
     };
     let utilities_scaling = NodegroupScalingConfig {
-        desired_size: Some(cmp::max(num_validators * 3, idle_utilities_size)),
+        desired_size: Some(cmp::max(num_validators * 3 + buffer, idle_utilities_size)),
         max_size: Some(cmp::max(
             num_validators * 3 * max_surge,
             idle_utilities_size,

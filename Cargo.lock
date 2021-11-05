@@ -3519,6 +3519,7 @@ dependencies = [
  "rusoto_sts",
  "serde",
  "serde_json",
+ "serde_yaml",
  "structopt 0.3.21",
  "tempfile",
  "termcolor",
@@ -8516,6 +8517,7 @@ dependencies = [
  "diem-sdk",
  "diem-workspace-hack",
  "forge",
+ "futures",
  "rand 0.8.4",
  "tokio",
 ]

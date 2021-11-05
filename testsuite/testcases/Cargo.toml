@@ -17,6 +17,7 @@ rand = "0.8.3"
 tokio = { version = "1.8.1", features = ["full"] }
 diem-logger = { path = "../../common/logger" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
+futures = "0.3.12"
 
 [[test]]
 name = "forge-local-compatibility"

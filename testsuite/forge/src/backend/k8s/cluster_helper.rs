@@ -9,7 +9,7 @@ use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use hyper_tls::HttpsConnector;
 use k8s_openapi::api::batch::v1::Job;
 use kube::{api::Api, client::Client as K8sClient, Config};
-use rand::Rng;
+use rand::{Rng, thread_rng};
 use rayon::prelude::*;
 use regex::Regex;
 use rusoto_core::Region;
@@ -30,6 +30,10 @@ use std::{
 };
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
+use rand::distributions::Alphanumeric;
+use serde::de::DeserializeOwned;
+use kube::api::{PostParams, ListParams};
+use k8s_openapi::api::core::v1::Pod;
 
 const HELM_BIN: &str = "helm";
 const KUBECTL_BIN: &str = "kubectl";
@@ -39,25 +43,24 @@ const VALIDATOR_SCALING_FACTOR: i64 = 3;
 const UTILITIES_SCALING_FACTOR: i64 = 3;
 const TRUSTED_SCALING_FACTOR: i64 = 1;
 
-async fn wait_genesis_job(kube_client: &K8sClient, era: &str) -> Result<()> {
+async fn wait_k8s_job(kube_client: &K8sClient, job_name: &str) -> Result<()> {
     diem_retrier::retry_async(k8s_retry_strategy(), || {
         let jobs: Api<Job> = Api::namespaced(kube_client.clone(), "default");
         Box::pin(async move {
-            let job_name = format!("diem-testnet-genesis-e{}", era);
-            debug!("Running get job: {}", &job_name);
-            let genesis_job = jobs.get_status(&job_name).await.unwrap();
-            debug!("Status: {:?}", genesis_job.status);
-            let status = genesis_job.status.unwrap();
+            debug!("Running get job: {}", job_name);
+            let current_job = jobs.get_status(job_name).await.unwrap();
+            debug!("Status: {:?}", current_job.status);
+            let status = current_job.status.unwrap();
             match status.succeeded {
                 Some(1) => {
-                    println!("Genesis job completed");
+                    println!("Job {} completed", job_name);
                     Ok(())
                 }
-                _ => bail!("Genesis job not completed"),
+                _ => bail!("Job {} not completed", job_name),
             }
         })
     })
-    .await
+        .await
 }
 
 async fn nodegroup_state_check(desire_size: i64) -> Result<()> {
@@ -323,7 +326,8 @@ pub fn clean_k8s_cluster(
     let rt = Runtime::new().unwrap();
     let mut validators = rt.block_on(async {
         let kube_client = create_k8s_client().await;
-        wait_genesis_job(&kube_client, &new_era).await.unwrap();
+        let job_name = format!("diem-testnet-genesis-e{}", new_era);
+        wait_k8s_job(&kube_client, &job_name).await.unwrap();
         let vals = get_validators(kube_client.clone(), &base_validator_image_tag)
             .await
             .unwrap();
@@ -599,4 +603,117 @@ pub fn scale_sts_replica(sts_name: &str, replica_num: u64) -> Result<()> {
     );
 
     Ok(())
+}
+
+/// Retrieves a spec instance of type T from a T template file.
+fn get_spec_instance_from_template<T: DeserializeOwned>(template_yaml: String) -> Result<T> {
+    let spec: serde_yaml::Value = serde_yaml::from_str(&template_yaml)?;
+    let spec = serde_json::value::to_value(spec)?;
+    serde_json::from_value(spec).map_err(|e| format_err!("serde_json::from_value failed: {}", e))
+}
+
+fn job_spec(
+    k8s_node: &str,
+    docker_image: &str,
+    command: &str,
+    job_name: &str,
+    back_off_limit: u32,
+) -> Result<(Job, String)> {
+    let suffix = thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(10)
+        .map(char::from)
+        .collect::<String>()
+        .to_ascii_lowercase();
+    let job_full_name = format!("{}-{}", job_name, suffix);
+
+    let job_yaml = format!(
+        include_str!("templates/job_template.yaml"),
+        name = &job_full_name,
+        label = job_name,
+        image = docker_image,
+        node_name = k8s_node,
+        command = command,
+        back_off_limit = back_off_limit,
+    );
+    let job_spec = get_spec_instance_from_template(job_yaml)?;
+    Ok((job_spec, job_full_name))
+}
+
+// just ensures jobs are started, but does not wait on completion
+async fn start_jobs(kube_client: &K8sClient, job: Job) -> Result<String> {
+    let pp = PostParams::default();
+    let job_api: Api<Job> = Api::namespaced(kube_client.clone(), "default");
+    let job_name = job_api.create(&pp, &job).await?.metadata.name.unwrap();
+    Ok(job_name)
+}
+
+async fn run_job(kube_client: &K8sClient, job: Job) -> Result<()> {
+    let job_name = start_jobs(kube_client, job).await?;
+    wait_k8s_job(kube_client, &job_name).await.unwrap();
+
+    Ok(())
+}
+
+pub async fn run(
+    kube_client: &K8sClient,
+    k8s_node: &str,
+    docker_image: &str,
+    command: &str,
+    job_name: &str,
+) -> Result<()> {
+    let back_off_limit = 0;
+    let (job_spec, _) =
+        job_spec(k8s_node, docker_image, command, job_name, back_off_limit)?;
+    debug!("Running job {} for node {}", job_name, k8s_node);
+    run_job(kube_client, job_spec).await
+}
+
+pub async fn cmd<S: AsRef<str>>(
+    kube_client: &K8sClient,
+    k8s_node: &str,
+    docker_image: &str,
+    command: S,
+    job_name: &str,
+) -> Result<()> {
+    run(kube_client, k8s_node, docker_image, command.as_ref(), job_name).await
+}
+
+/// Runs command on the same host in separate utility container based on cluster-test-util image
+pub async fn util_cmd<S: AsRef<str>>(kube_client: &K8sClient, k8s_node: &str, command: S, job_name: &str) -> Result<()> {
+    cmd(
+        kube_client,
+        k8s_node,
+        "853397791086.dkr.ecr.us-west-2.amazonaws.com/cluster-test-util:latest",
+        command,
+        job_name,
+    )
+        .await
+}
+
+#[derive(Clone, Debug)]
+pub struct KubePod {
+    pub name: String,
+    pub node_name: String,
+}
+
+impl TryFrom<Pod> for KubePod {
+    type Error = anyhow::Error;
+
+    fn try_from(pod: Pod) -> Result<Self, Self::Error> {
+        let metadata = pod.metadata;
+        let name = metadata
+            .name
+            .ok_or_else(|| format_err!("node name not found"))?;
+        let spec = pod.spec;
+        let node_name = spec.unwrap().node_name.ok_or_else(|| format_err!("spec not found for node"))?;
+        Ok(Self { name, node_name })
+    }
+}
+
+pub async fn list_pods(client: K8sClient) -> Result<Vec<KubePod>> {
+    let node_api: Api<Pod> = Api::all(client);
+    let lp = ListParams::default();
+    let services = node_api.list(&lp).await?.items;
+    services.into_iter().map(KubePod::try_from).collect()
 }

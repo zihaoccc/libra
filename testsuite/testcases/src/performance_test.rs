@@ -40,8 +40,7 @@ impl NetworkTest for PerformanceBenchmark {
             .into_iter()
             .filter(|s| s.name.contains("diem-validator-validator")).next().unwrap();
 
-        let run_id = env::var("RUN_ID")
-            .map_err(|e| anyhow!("RUN_ID could not be read from the environment, Error:{}", e))?;
+        let run_id = "ct-0-cluster-test-circleci-1636057";
         let filename = "diem-node-perf.svg";
         let command = generate_perf_flamegraph_command(filename, &run_id, 60);
         rt.block_on(async {

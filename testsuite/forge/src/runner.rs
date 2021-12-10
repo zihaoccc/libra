@@ -279,6 +279,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     NetworkContext::new(CoreContext::from_rng(&mut rng), &mut *swarm, &mut report);
                 let result = run_test(|| test.run(&mut network_ctx));
                 summary.handle_result(test.name().to_owned(), result)?;
+                test.recovery()?;
             }
 
             report.print_report();

@@ -3,6 +3,7 @@
 
 use super::Test;
 use crate::{CoreContext, Result, Swarm, TestReport};
+use std::{thread, time::Duration};
 
 /// The testing interface which defines a test written with full control over an existing network.
 /// Tests written against this interface will have access to both the Root account as well as the
@@ -10,6 +11,15 @@ use crate::{CoreContext, Result, Swarm, TestReport};
 pub trait NetworkTest: Test {
     /// Executes the test against the given context.
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()>;
+
+    /// TODO need to implement proper node recovery check:
+    /// endpoint check
+    /// commit seq check
+    /// node health check
+    fn recovery(&self) -> Result<()> {
+        thread::sleep(Duration::from_secs(10));
+        Ok(())
+    }
 }
 
 pub struct NetworkContext<'t> {

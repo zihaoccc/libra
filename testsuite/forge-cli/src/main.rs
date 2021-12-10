@@ -349,9 +349,9 @@ fn pre_release_suite() -> ForgeConfig<'static> {
             &FixedTpsTest,
             &PerformanceBenchmark,
             &NonZeroGasPrice,
-            &PartialNodesDown,
             &ReconfigurationTest,
             &StateSyncPerformance,
+            &PartialNodesDown,
         ])
 }
 

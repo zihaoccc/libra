@@ -309,7 +309,7 @@ dependencies = [
  "structopt 0.3.21",
  "tokio",
  "tokio-stream",
- "tokio-util",
+ "tokio-util 0.7.0",
  "toml",
  "warp",
 ]
@@ -2058,7 +2058,7 @@ dependencies = [
  "futures",
  "pin-project",
  "tokio",
- "tokio-util",
+ "tokio-util 0.7.0",
 ]
 
 [[package]]
@@ -2421,7 +2421,7 @@ dependencies = [
  "syn 0.15.44",
  "syn 1.0.62",
  "tokio",
- "tokio-util",
+ "tokio-util 0.7.0",
  "toml",
  "tracing",
  "warp",
@@ -3344,7 +3344,7 @@ dependencies = [
  "indexmap",
  "slab",
  "tokio",
- "tokio-util",
+ "tokio-util 0.6.9",
  "tracing",
 ]
 
@@ -3863,7 +3863,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-native-tls",
- "tokio-util",
+ "tokio-util 0.6.9",
  "tower",
  "url",
 ]
@@ -4545,7 +4545,7 @@ dependencies = [
  "proxy",
  "serde",
  "tokio",
- "tokio-util",
+ "tokio-util 0.7.0",
  "url",
 ]
 
@@ -4593,7 +4593,7 @@ dependencies = [
  "tokio",
  "tokio-retry",
  "tokio-stream",
- "tokio-util",
+ "tokio-util 0.7.0",
 ]
 
 [[package]]
@@ -6603,7 +6603,7 @@ dependencies = [
  "network-builder",
  "rand 0.8.3",
  "tokio",
- "tokio-util",
+ "tokio-util 0.7.0",
 ]
 
 [[package]]
@@ -7301,9 +7301,23 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.6.4"
+version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec31e5cc6b46e653cf57762f36f71d5e6386391d88a72fd6db4508f8f676fb29"
+checksum = "9e99e1983e5d376cd8eb4b66604d2e99e79f5bd988c3055891dcd8c9e2604cc0"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "futures-sink",
+ "log",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-util"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64910e1b9c1901aaf5375561e35b9c057d95ff41a44ede043a03e09279eabaf1"
 dependencies = [
  "bytes",
  "futures-core",
@@ -7333,7 +7347,7 @@ dependencies = [
  "futures-util",
  "pin-project",
  "tokio",
- "tokio-util",
+ "tokio-util 0.6.9",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -7773,7 +7787,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-stream",
  "tokio-tungstenite",
- "tokio-util",
+ "tokio-util 0.6.9",
  "tower-service",
  "tracing",
  "tracing-futures",

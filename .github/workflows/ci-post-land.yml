@@ -303,15 +303,6 @@ jobs:
           exit $success
         env:
           DOCKER_CONTENT_TRUST_REPOSITORY_PASSPHRASE: ${{ secrets.ENV_DOCKERHUB_KEY_PASSWORD }}
-      - name: push to novi ecr
-        if: ${{ always() && github.ref != 'refs/heads/auto' }}
-        run: |
-          #push to novi ecr with standard names
-          BRANCH=$(echo "$GITHUB_REF" | sed 's|.*/||' )
-          GIT_REV=$(git rev-parse --short=8 HEAD)
-          aws ecr get-login-password --region ${{ secrets.ENV_NOVI_ECR_AWS_REGION }} | \
-          docker login --username AWS --password-stdin "${AWS_ECR_ACCOUNT_URL}"
-          docker/docker_republish.sh -t ${BRANCH}_${GIT_REV} -r ${AWS_ECR_ACCOUNT_URL} -d
 
   rustdoc:
     needs: prepare

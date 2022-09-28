@@ -28,7 +28,7 @@ diem-workspace-hack = { path = "../../common/workspace-hack" }
 
 
 [dev-dependencies]
-warp = "0.3.0"
+warp = "0.3.3"
 diem-config = { path = "../../config" }
 
 
